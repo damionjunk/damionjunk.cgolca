@@ -15,7 +15,7 @@
   [x y & [board]]
   {:x-max  x
    :y-max  y
-   :render :pre
+   :render :html
    :board  (or board
                (take (* x y)
                      (repeatedly (fn [& _] (rand-int 2)))
@@ -85,10 +85,10 @@
                                        (range x-max))))
                          (range y-max)))))
 
-(defmethod render-board :pre  [{:keys [x-max y-max board] :as fboard}]
-  (dom/pre nil (render-board (assoc fboard :render :ascii))))
+(defmethod render-board :pre  [board]
+  (dom/pre nil (render-board (assoc board :render :ascii))))
 
-(defmethod render-board :html [{:keys [x-max y-max board]}]
+(defmethod render-board :html [{:keys [x-max board]}]
   (apply dom/div nil
          (flatten
            (interpose (dom/br nil)
