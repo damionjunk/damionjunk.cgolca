@@ -5,11 +5,6 @@
   (:require-macros
     [cljs.core.async.macros :as m :refer [go]]))
 
-
-;; Our OM state object to render
-(defonce master-board (atom {}))
-
-
 (defn gen-board
   "Produces an empty/dead grid of dimensions `x` by `y`.
    0 represents a 'dead' cell.
@@ -18,10 +13,17 @@
 
    2D space is being represented with a 1D sequence of alive/dead states."
   [x y & [board]]
-  {:x-max x
-   :y-max y
-   :board (or board
-              (take (* x y) (repeatedly (constantly 0))))})
+  {:x-max  x
+   :y-max  y
+   :render :pre
+   :board  (or board
+               (take (* x y)
+                     (repeatedly (fn [& _] (rand-int 2)))
+                     ;(repeatedly (constantly 0))
+                     ))})
+
+;; Our OM state object to render
+(defonce master-board (atom (gen-board 30 25)))
 
 ;; http://fn-code.blogspot.com/2015/03/conways-game-of-life-demonstration-and.html
 (defn neighbor-xy
@@ -38,15 +40,12 @@
   (map (fn [[nx ny]] (nth board (+ (* x-max ny) nx)))
        (filter (fn [[nx ny]] (and (>= nx 0) (>= ny 0) (< nx x-max) (< ny y-max))) (neighbor-xy [px py]))))
 
-
-
 (defn ->2d
   "Given a `board` and a position in the 1D array, find the 2D position
    on our grid."
   [{:keys [x-max]} x]
   (let [y (int (/ x x-max))]
     [(- x (* x-max y)) y]))
-
 
 ;; Any live cell with fewer than two live neighbours dies, as if caused by under-population.
 ;; Any live cell with two or three live neighbours lives on to the next generation.
@@ -69,32 +68,43 @@
                               (next-cell-state board [pos alive]))
                             (:board board))))
 
-(defn show-board
-      [{:keys [x-max y-max board]}]
-      (apply str
-             (interpose "\n"
-                        (map (fn [y]
-                                 (apply str
-                                        (map (fn [x]
-                                                 (nth board (+ (* x-max y) x)))
-                                             (range x-max))))
-                             (range y-max)))))
-
-
-(defn timeout [ms]
-      (let [c (chan)]
-           (js/setTimeout (fn [] (close! c)) ms)
-           c))
 
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; OM : Define a view function to render the CA board state
 ;;
 
+(defmulti render-board (fn [{:keys [render]}] render))
+
+(defmethod render-board :ascii [{:keys [x-max y-max board]}]
+  (apply str
+         (interpose "\n"
+                    (map (fn [y]
+                           (apply str
+                                  (map (fn [x]
+                                         (nth board (+ (* x-max y) x)))
+                                       (range x-max))))
+                         (range y-max)))))
+
+(defmethod render-board :pre  [{:keys [x-max y-max board] :as fboard}]
+  (dom/pre nil (render-board (assoc fboard :render :ascii))))
+
+(defmethod render-board :html [{:keys [x-max y-max board]}]
+  (apply dom/div nil
+         (flatten
+           (interpose (dom/br nil)
+                      (map (partial map (fn [e]
+                                          (dom/span #js {:className (if (zero? e) "dg" "gg")} e)))
+                           (partition x-max board))))))
+
+(defmethod render-board :default [_])
+
+
+
 (defn ca-view [data owner]
       (reify
         om/IRender
         (render [this]
-                (dom/pre nil (show-board data)))))
+          (render-board data))))
 
 (om/root ca-view master-board
          {:target (. js/document (getElementById "main-area"))})
@@ -104,12 +114,20 @@
 ;; core.async Thread/sleep board update
 ;;
 
-(go
-  (while true
-    (do
-      (<! (timeout 500))
-      (swap! master-board step))))
+(defn timeout [ms]
+  (let [c (chan)]
+    (js/setTimeout (fn [] (close! c)) ms)
+    c))
 
+(defn render-loop []
+  (go
+    (while (:render @master-board)
+      (do
+        (<! (timeout 750))
+        (swap! master-board step)))
+    (.log js/console "render loop done.")))
+
+(render-loop)
 
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; REPL Stuff
@@ -117,6 +135,7 @@
 
 (comment
 
+  (dom/pre nil "hi")
   ;; Connect to the nREPL:
   ;; https://github.com/bhauman/lein-figwheel/wiki/Using-the-Figwheel-REPL-within-NRepl
   ;; https://github.com/bhauman/lein-figwheel/wiki/Running-figwheel-in-a-Cursive-Clojure-REPL
@@ -132,6 +151,12 @@
   ;; Same thing, since we're not really mapping over the :board data, just the board shape.
   (let [{:keys [x-max y-max]} @master-board]
     (swap! master-board assoc :board (take (* x-max y-max) (repeatedly (fn [& _] (rand-int 2))))))
+
+  ;; Turn off the CPU killer. :)
+  (swap! master-board assoc :render nil)
+  (swap! master-board assoc :render :html)
+  (swap! master-board assoc :render :pre)
+  (render-loop)
 
 
   (reset! master-board (gen-board 30 30))
