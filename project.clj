@@ -9,20 +9,16 @@
                  [org.omcljs/om "0.8.8"]]
   :plugins [[lein-cljsbuild "1.0.6"]
             [lein-figwheel "0.3.3"]]
-  :figwheel {
-             :nrepl-port 7888
-             }
+  :figwheel {:nrepl-port 7888 }
+  :clean-targets ^{:protect false} ["resources/public/js/app.js" "resources/public/js/out/" "target"]
   :cljsbuild {
-              :builds [{:id           "dev"
-                        :figwheel true
-                        :source-paths ["src"]
-                        :compiler     {:output-to     "resources/public/js/app.js"
-                                       :output-dir    "resources/public/js/out/"
-                                       :optimizations :none
-                                       :source-map    true}}
-                       {:id           "release"
-                        :source-paths ["src"]
-                        :compiler     {:main          main.core
-                                       :output-to     "resources/public/js/app.js"
-                                       :optimizations :advanced
-                                       :pretty-print  false}}]})
+              :builds {:dev  {:figwheel     true
+                              :source-paths ["src"]
+                              :compiler     {:output-to     "resources/public/js/app.js"
+                                             :output-dir    "resources/public/js/out/"
+                                             :optimizations :none
+                                             :source-map    true}}
+                       :release {:source-paths ["src"]
+                                 :compiler     {:output-to     "resources/public/js/app.js"
+                                                :optimizations :advanced
+                                                :pretty-print  false}}}})
