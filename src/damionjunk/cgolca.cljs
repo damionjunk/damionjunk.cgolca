@@ -1,7 +1,7 @@
 (ns damionjunk.cgolca
   (:require [om.core :as om]
             [om.dom :as dom]
-            [cljs.core.async :refer [chan close!]])
+            [cljs.core.async :refer [chan close! <! timeout]])
   (:require-macros
     [cljs.core.async.macros :as m :refer [go]]))
 
@@ -113,11 +113,6 @@
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; core.async Thread/sleep board update
 ;;
-
-(defn timeout [ms]
-  (let [c (chan)]
-    (js/setTimeout (fn [] (close! c)) ms)
-    c))
 
 (defn render-loop []
   (go
